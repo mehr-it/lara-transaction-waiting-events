@@ -118,7 +118,7 @@
 							$locks,
 							$listener->waitForTransactionsTimeout ?? 1,
 							$listener->waitForTransactionsRetryAfter ?? 5,
-							$lockTtl,
+							$lockTtl
 						)
 					)
 				];
