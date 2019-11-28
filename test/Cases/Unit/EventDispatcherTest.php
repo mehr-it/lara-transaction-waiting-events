@@ -11,6 +11,7 @@
 	use Illuminate\Support\Facades\DB;
 	use MehrIt\LaraMySqlLocks\Exception\DbLockTimeoutException;
 	use MehrIt\LaraMySqlLocks\Facades\DbLock;
+	use MehrIt\LaraTransactionWaitingEvents\EventDispatcher;
 	use MehrIt\LaraTransactionWaitingEvents\Queue\CallTransactionWaitingQueuedListener;
 	use MehrItLaraTransactionWaitingEventsTest\Helpers\Listener;
 	use MehrItLaraTransactionWaitingEventsTest\Helpers\QueuedListener;
@@ -156,6 +157,37 @@
 
 
 			$this->assertLockMissing(Arr::first($transactionLocks));
+		}
+
+		public function testDispatch_waitingForTransactions_transactionStartedButWaitingDisabled() {
+
+
+			/** @var Dispatcher|EventDispatcher $events */
+			$events = app('events');
+
+			$events->listen('test-event', QueuedWaitingListener::class);
+
+			Bus::fake([
+				CallTransactionWaitingQueuedListener::class,
+				CallQueuedListener::class,
+			]);
+
+			DB::transaction(function() use ($events, &$transactionLocks) {
+
+				$this->assertSame(true, $events->getEventsWaitForTransaction());
+				$this->assertSame($events, $events->setEventsWaitForTransactions(false));
+				$this->assertSame(false, $events->getEventsWaitForTransaction());
+
+				$events->dispatch('test-event');
+
+
+				Bus::assertDispatched(CallQueuedListener::class, function (CallQueuedListener $job) {
+
+					return
+						$job->class === QueuedWaitingListener::class &&
+						$job->method === 'handle';
+				});
+			});
 		}
 
 		public function testDispatch_waitingForTransactions_transactionStarted_waitForTransactionsPropertySet() {

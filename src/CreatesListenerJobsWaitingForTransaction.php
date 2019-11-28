@@ -10,6 +10,7 @@
 	use Illuminate\Database\Events\TransactionCommitted;
 	use Illuminate\Database\Events\TransactionRolledBack;
 	use Illuminate\Support\Str;
+	use InvalidArgumentException;
 	use MehrIt\LaraMySqlLocks\DbLock;
 	use MehrIt\LaraMySqlLocks\DbLockFactory;
 	use MehrIt\LaraMySqlLocks\Exception\DbLockReleaseException;
@@ -24,6 +25,8 @@
 	 */
 	trait CreatesListenerJobsWaitingForTransaction
 	{
+		protected $eventsWaitForTransactions = true;
+
 		/**
 		 * @var DbLockFactory
 		 */
@@ -48,6 +51,25 @@
 		 * @var int[] Ids of the PDO connections
 		 */
 		protected $dbConnectionInstanceIds = [];
+
+		/**
+		 * Gets if events should wait for transactions to complete
+		 * @return bool True if waiting. Else false.
+		 */
+		public function getEventsWaitForTransaction(): bool {
+			return $this->eventsWaitForTransactions;
+		}
+
+		/**
+		 * Sets if events should wait for transactions to complete
+		 * @param bool $value The value
+		 * @return $this
+		 */
+		public function setEventsWaitForTransactions(bool $value) {
+			$this->eventsWaitForTransactions = $value;
+
+			return $this;
+		}
 
 		/**
 		 * Fire an event and call the listeners.
@@ -84,49 +106,53 @@
 		 */
 		protected function createListenerAndJob($class, $method, $arguments) {
 
-			$listener = (new ReflectionClass($class))->newInstanceWithoutConstructor();
+			// check if enabled
+			if ($this->eventsWaitForTransactions) {
 
-			if ($listener instanceof WaitsForTransactions) {
+				$listener = (new ReflectionClass($class))->newInstanceWithoutConstructor();
 
-				// get a list of the connections to wait for transactions to complete
-				$waitForTransactionsOnConnections = $listener->waitForTransactions ?? null;
-				if (!is_array($waitForTransactionsOnConnections))
-					$waitForTransactionsOnConnections = [$waitForTransactionsOnConnections];
+				if ($listener instanceof WaitsForTransactions) {
 
-				$lockTtl = $listener->waitForTransactionsTtl ?? 86400;
+					// get a list of the connections to wait for transactions to complete
+					$waitForTransactionsOnConnections = $listener->waitForTransactions ?? null;
+					if (!is_array($waitForTransactionsOnConnections))
+						$waitForTransactionsOnConnections = [$waitForTransactionsOnConnections];
 
-				// create locks for all required connections
-				$locks = [];
-				foreach($waitForTransactionsOnConnections as $connection) {
+					$lockTtl = $listener->waitForTransactionsTtl ?? 86400;
 
-					$connection = $this->getDbConnectionName($connection);
+					// create locks for all required connections
+					$locks = [];
+					foreach ($waitForTransactionsOnConnections as $connection) {
 
-					$transactionLock = $this->makeTransactionLock($connection, $lockTtl);
-					if ($transactionLock)
-						$locks[$connection] = $transactionLock;
-				}
+						$connection = $this->getDbConnectionName($connection);
 
-				// create waiting job and return with listener
-				return [
-					$listener,
-					$this->propagateListenerOptions(
+						$transactionLock = $this->makeTransactionLock($connection, $lockTtl);
+						if ($transactionLock)
+							$locks[$connection] = $transactionLock;
+					}
+
+					// create waiting job and return with listener
+					return [
 						$listener,
-						new CallTransactionWaitingQueuedListener(
-							$class,
-							$method,
-							$arguments,
-							$locks,
-							$listener->waitForTransactionsTimeout ?? 1,
-							$listener->waitForTransactionsRetryAfter ?? 5,
-							$lockTtl
+						$this->propagateListenerOptions(
+							$listener,
+							new CallTransactionWaitingQueuedListener(
+								$class,
+								$method,
+								$arguments,
+								$locks,
+								$listener->waitForTransactionsTimeout ?? 1,
+								$listener->waitForTransactionsRetryAfter ?? 5,
+								$lockTtl
+							)
 						)
-					)
-				];
+					];
+				}
 			}
-			else {
-				// call parent for non-waiting listeners
-				return parent::createListenerAndJob($class, $method, $arguments);
-			}
+
+			// call parent for non-waiting listeners
+			return parent::createListenerAndJob($class, $method, $arguments);
+
 
 		}
 
@@ -174,7 +200,12 @@
 		 * @param ConnectionEvent $event The transaction event
 		 */
 		protected function onTransactionStateChanged(ConnectionEvent $event) {
-			$connectionName    = $this->getDbConnectionName($event->connectionName);
+			$connectionName = $this->getDbConnectionName($event->connectionName);
+
+			// Stop here if the connection cannot be found in the list of configured connections. It might
+			// be a temporary connection name which we don't have to care for
+			if (!$this->isDbConnectionConfigured($connectionName))
+				return;
 
 			// remember the transaction state
 			$transactionActive = $this->rememberTransactionState($connectionName);
@@ -230,6 +261,21 @@
 				return $this->getDatabaseManager()->getDefaultConnection();
 
 			return $name;
+		}
+
+		/**
+		 * Checks if a DB connection with given name is configured
+		 * @param string $name The name
+		 * @return bool True if connection is configured. Else false.
+		 */
+		protected function isDbConnectionConfigured($name): bool {
+			try {
+				$this->getDatabaseManager()->connection($name);
+				return true;
+			}
+			catch (InvalidArgumentException $ex) {
+				return false;
+			}
 		}
 
 		/**
