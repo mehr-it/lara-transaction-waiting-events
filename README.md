@@ -107,4 +107,12 @@ transactions, you might want to adapt these values:
         }
     }
 
+### Disable transaction waiting events
+Sometimes - especially when running tests or using the 'sync' queue driver - you might want to 
+disable transaction waiting events and dispatch them even if the transaction has not been 
+committed yet. You can do so, by setting `EVENTS_WAIT_FOR_TRANSACTIONS` to `false` in your
+.env file:
+
+    EVENTS_WAIT_FOR_TRANSACTIONS=false
+
     
