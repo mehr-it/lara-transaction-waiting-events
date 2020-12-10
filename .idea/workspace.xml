@@ -20,11 +20,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="69d91326-590e-44b9-ac82-00365f7c13ce" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/test-bootstrap.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.travis.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.travis.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/composer.json" beforeDir="false" afterPath="$PROJECT_DIR$/composer.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/phpunit.xml.example" beforeDir="false" afterPath="$PROJECT_DIR$/phpunit.xml.example" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test-bootstrap.php" beforeDir="false" afterPath="$PROJECT_DIR$/test-bootstrap.php" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -141,7 +138,7 @@
   </component>
   <component name="PropertiesComponent">
     <property name="WebServerToolWindowFactoryState" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../lara-dynamic-schedules" />
     <property name="node.js.detected.package.eslint" value="true" />
     <property name="node.js.detected.package.tslint" value="true" />
     <property name="node.js.path.for.package.eslint" value="project" />
@@ -335,7 +332,8 @@
       <workItem from="1605599062509" duration="7346000" />
       <workItem from="1607513033223" duration="854000" />
       <workItem from="1607513935417" duration="515000" />
-      <workItem from="1607514545886" duration="434000" />
+      <workItem from="1607514545886" duration="563000" />
+      <workItem from="1607515169924" duration="3155000" />
     </task>
     <task id="LOCAL-00001" summary="initial commit">
       <created>1574968394900</created>
@@ -372,7 +370,14 @@
       <option name="project" value="LOCAL" />
       <updated>1575996838779</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="added support for laravel 7/8">
+      <created>1607515013087</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1607515013087</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -396,7 +401,8 @@
     <MESSAGE value="FIX: syntax error in PHP 7.2" />
     <MESSAGE value="Added ability to disabled waiting for transactions. Also unknown connection's events are ignored" />
     <MESSAGE value="added config to disable transaction waiting events" />
-    <option name="LAST_COMMIT_MESSAGE" value="added config to disable transaction waiting events" />
+    <MESSAGE value="added support for laravel 7/8" />
+    <option name="LAST_COMMIT_MESSAGE" value="added support for laravel 7/8" />
   </component>
   <component name="XDebuggerManager">
     <watches-manager>
