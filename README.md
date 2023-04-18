@@ -1,6 +1,6 @@
 # Laravel events waiting for transactions to complete
-This package implements queued events for Laravel which are **guaranteed not be handled before** any pending database 
-transaction has been closed.
+This package implements queued events for Laravel which are **guaranteed not be handled before** any 
+pending database transaction has been closed.
 
 ## Why is it necessary?
 Queued event listeners often rely on data that is written by the event emitter. Even the usage of 
@@ -10,7 +10,7 @@ mechanism to block event handling after any pending database transactions are do
 Many other packages dealing with events and transactions, simply collect events in memory until the
 database transactions have been committed. Then they send them to queue. However if the process runs
 into an error condition after committing and before having sent all events to the queue, you will
-loose some events. Imagine a customer order never being processed due to a lost event...
+lose some events. Imagine a customer order never being processed due to a lost event...
 
 It would be much better to emit the event first and then commit the database transaction after the event 
 has been sent (Note: the event handler must gracefully handle cases where the transaction is rolled 
@@ -33,8 +33,8 @@ should be no extra work here.
 
 This packages extends Laravel's event dispatcher to set "transaction locks" whenever a queued
 listener (marked with the `WaitsForTransactions` interface) is invoked. It uses 
-[mehr-it/lara-mysql-locks](https://github.com/mehr-it/lara-mysql-locks) to set the 
-"transaction locks". Therefore **this package only works for MySQL connections**. The lock implementation
+[MySQL locking functions](https://dev.mysql.com/doc/refman/5.7/en/locking-functions.html) to set the 
+"transaction locks". Therefore, **this package only works for MySQL connections**. The lock implementation
 assures that locks are always removed when a transaction ends. No matter if committed, rolled back 
 or the process died unexpectedly.
 
@@ -89,7 +89,7 @@ another connection name or specify multiple connections using the `waitForTransa
     }
     
 #### Timeout and retry delay
-By default the listener waits up to 1s for transactions to complete. If yet not complete, the
+By default, the listener waits up to 1s for transactions to complete. If yet not complete, the
 handler job is released back to queue to be retried in 5s. If you are using long-running
 transactions, you might want to adapt these values:
 

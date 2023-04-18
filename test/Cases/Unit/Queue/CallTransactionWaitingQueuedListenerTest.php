@@ -8,6 +8,7 @@
 	use Illuminate\Support\Arr;
 	use Illuminate\Support\Facades\DB;
 	use MehrIt\LaraMySqlLocks\Facades\DbLock;
+	use MehrIt\LaraTransactionWaitingEvents\MySqlLock;
 	use MehrIt\LaraTransactionWaitingEvents\Queue\CallTransactionWaitingQueuedListener;
 	use MehrItLaraTransactionWaitingEventsTest\Cases\Unit\TestCase;
 	use MehrItLaraTransactionWaitingEventsTest\Cases\Unit\TestsParallelProcesses;
@@ -20,7 +21,7 @@
 
 		public function testConstructor() {
 
-			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], ['default' => 'my-lock'], 5, 18, 7200);
+			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], ['default' => 'my-lock'], 5, 18);
 
 			$this->assertSame(QueuedWaitingListener::class, $job->class);
 			$this->assertSame('handle', $job->method);
@@ -28,7 +29,6 @@
 			$this->assertSame(['default' => 'my-lock'], $job->transactionLocks);
 			$this->assertSame(5, $job->transactionLockWaitTimeout);
 			$this->assertSame(18, $job->transactionLockRetryAfter);
-			$this->assertSame(7200, $job->transactionLockTtl);
 
 		}
 
@@ -37,7 +37,7 @@
 			/** @var Job|MockObject $jobMock */
 			$jobMock = $this->getMockBuilder(Job::class)->getMock();
 
-			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], [], 5, 18, 7200);
+			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], [], 5, 18);
 			$job->setJob($jobMock);
 
 			/** @var QueuedWaitingListener|MockObject $listenerMock */
@@ -67,7 +67,7 @@
 				DB::getDefaultConnection() => 'lock-' . uniqid(),
 			];
 
-			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], $locks, 5, 18, 7200);
+			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], $locks, 5, 18);
 			$job->setJob($jobMock);
 
 			/** @var QueuedWaitingListener|MockObject $listenerMock */
@@ -129,7 +129,7 @@
 				DB::getDefaultConnection() => 'lock-' . uniqid(),
 			];
 
-			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], $locks, 1, 18, 7200);
+			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], $locks, 1, 18);
 			$job->setJob($jobMock);
 
 			/** @var QueuedWaitingListener|MockObject $listenerMock */
@@ -154,13 +154,18 @@
 				},
 				function($sh) use ($locks) {
 
-					$lock = DbLock::lock(Arr::first($locks), 0, 10);
+					/** @var MySqlLock $lock */
+					$lock = app(MySqlLock::class);
+					
+					if (!$lock->getLock(null, Arr::first($locks), 0))
+						$this->fail('Failed to acquire lock');
 
 					$this->sendMessage('acquired', $sh);
 
 					$this->assertNextMessage('job handled', $sh);
 
-					$lock->release();
+					$lock->releaseLock(null, Arr::first($locks));
+					
 
 				}
 			);
@@ -181,7 +186,7 @@
 				'other' => 'lock-' . uniqid(),
 			];
 
-			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], $locks, 1, 18, 7200);
+			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], $locks, 1, 18);
 			$job->setJob($jobMock);
 
 			/** @var QueuedWaitingListener|MockObject $listenerMock */
@@ -206,13 +211,17 @@
 				},
 				function($sh) use ($locks) {
 
-					$lock = DbLock::lock($locks['other'], 0, 10, 'other');
+					/** @var MySqlLock $lock */
+					$lock = app(MySqlLock::class);
+
+					if (!$lock->getLock('other', $locks['other'], 0))
+						$this->fail('Failed to acquire lock');
 
 					$this->sendMessage('acquired', $sh);
 
 					$this->assertNextMessage('job handled', $sh);
 
-					$lock->release();
+					$lock->releaseLock('other', $locks['other']);
 
 				}
 			);
@@ -231,7 +240,7 @@
 				DB::getDefaultConnection() => 'lock-' . uniqid(),
 			];
 
-			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], $locks, 4, 18, 7200);
+			$job = new CallTransactionWaitingQueuedListener(QueuedWaitingListener::class, 'handle', ['event' => 'my-event'], $locks, 4, 18);
 			$job->setJob($jobMock);
 
 			/** @var QueuedWaitingListener|MockObject $listenerMock */
@@ -261,13 +270,17 @@
 				},
 				function ($sh) use ($locks) {
 
-					$lock = DbLock::lock(Arr::first($locks), 0, 10);
+					/** @var MySqlLock $lock */
+					$lock = app(MySqlLock::class);
+					
+					if (!$lock->getLock(null, Arr::first($locks), 0))
+						$this->fail('Failed to acquire lock');
 
 					$this->sendMessage('acquired', $sh);
 
 					sleep(2);
 
-					$lock->release();
+					$lock->releaseLock(null, Arr::first($locks));
 
 
 				}

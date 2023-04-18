@@ -9,11 +9,7 @@
 	use Illuminate\Database\Events\TransactionBeginning;
 	use Illuminate\Database\Events\TransactionCommitted;
 	use Illuminate\Database\Events\TransactionRolledBack;
-	use Illuminate\Support\Str;
 	use InvalidArgumentException;
-	use MehrIt\LaraMySqlLocks\DbLock;
-	use MehrIt\LaraMySqlLocks\DbLockFactory;
-	use MehrIt\LaraMySqlLocks\Exception\DbLockReleaseException;
 	use MehrIt\LaraTransactionWaitingEvents\Contracts\WaitsForTransactions;
 	use MehrIt\LaraTransactionWaitingEvents\Queue\CallTransactionWaitingQueuedListener;
 	use ReflectionClass;
@@ -28,10 +24,10 @@
 		protected $eventsWaitForTransactions = true;
 
 		/**
-		 * @var DbLockFactory
+		 * @var MySqlLock
 		 */
-		protected $lockFactory;
-
+		protected $mySqlLock;
+		
 		/**
 		 * @var DatabaseManager
 		 */
@@ -43,7 +39,7 @@
 		protected $activeDbTransactions = [];
 
 		/**
-		 * @var DbLock[] The DB transaction locks. Connection name as key
+		 * @var string[] The DB transaction locks. Connection name as key
 		 */
 		protected $dbTransactionLocks = [];
 
@@ -117,8 +113,7 @@
 					$waitForTransactionsOnConnections = $listener->waitForTransactions ?? null;
 					if (!is_array($waitForTransactionsOnConnections))
 						$waitForTransactionsOnConnections = [$waitForTransactionsOnConnections];
-
-					$lockTtl = $listener->waitForTransactionsTtl ?? 86400;
+					
 
 					// create locks for all required connections
 					$locks = [];
@@ -126,7 +121,7 @@
 
 						$connection = $this->getDbConnectionName($connection);
 
-						$transactionLock = $this->makeTransactionLock($connection, $lockTtl);
+						$transactionLock = $this->makeTransactionLock($connection);
 						if ($transactionLock)
 							$locks[$connection] = $transactionLock;
 					}
@@ -142,8 +137,7 @@
 								$arguments,
 								$locks,
 								$listener->waitForTransactionsTimeout ?? 1,
-								$listener->waitForTransactionsRetryAfter ?? 5,
-								$lockTtl
+								$listener->waitForTransactionsRetryAfter ?? 5
 							)
 						)
 					];
@@ -160,10 +154,9 @@
 		 * Creates a lock being released after transaction end and returns the lock name. If a lock for the current transaction exists, it will be used.
 		 * If no transaction is active for the given connection, no lock is created and null is returned
 		 * @param string $connection The connection name
-		 * @param int $ttl The TTL for the lock
 		 * @return string|null The lock name or null if no transaction is active.
 		 */
-		protected function makeTransactionLock(string $connection, int $ttl): ?string {
+		protected function makeTransactionLock(string $connection): ?string {
 
 			// Check if we are still using the same PDO connection. If not, a reconnect has taken place meanwhile and
 			// our created lock is obsolete and the transaction level has to be updated
@@ -186,13 +179,16 @@
 
 				// remember the PDO instance, which allows us to detect reconnects
 				$this->rememberPdoConnection($connection);
+				
+				$lockName = 'dbtx-' . bin2hex(random_bytes(16));
+				
+				if (!$this->mySqlLock()->getLock($connection, $lockName, 0))
+					throw new \RuntimeException("Failed to create transaction lock \"{$lockName}\"");
 
-				$this->dbTransactionLocks[$connection] = $this->getLockFactory()->lock('dbtx-' . (string)Str::uuid(), 0, $ttl, $connection);
+				$this->dbTransactionLocks[$connection] = $lockName;
 			}
 
-			$this->dbTransactionLocks[$connection]->acquired();
-
-			return $this->dbTransactionLocks[$connection]->getName();
+			return $this->dbTransactionLocks[$connection];
 		}
 
 		/**
@@ -239,13 +235,7 @@
 			$activeLock = ($this->dbTransactionLocks[$connectionName] ?? null);
 
 			if ($activeLock) {
-				try {
-					$activeLock->release();
-				}
-				catch (DbLockReleaseException $ex) {
-					// if this happens, we can ignore it, because the lock is automatically released because it ends with the the transaction
-					report($ex);
-				}
+				$this->mySqlLock()->releaseLock($connectionName, $activeLock);
 
 				$this->dbTransactionLocks[$connectionName] = null;
 			}
@@ -318,17 +308,11 @@
 
 			return $this->databaseManager;
 		}
-
-		/**
-		 * Gets a lock factory instance
-		 * @return DbLockFactory
-		 */
-		protected function getLockFactory() {
-			if (!$this->lockFactory)
-				$this->lockFactory = app(DbLockFactory::class);
-
-			return $this->lockFactory;
+		
+		protected function mySqlLock(): MySqlLock {
+			if (!$this->mySqlLock)
+				$this->mySqlLock = app(MySqlLock::class);
+			
+			return $this->mySqlLock;
 		}
-
-
 	}

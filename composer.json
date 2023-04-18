@@ -20,7 +20,6 @@
   },
   "require": {
     "php": ">=7.1",
-    "mehr-it/lara-mysql-locks": "^2.1.0",
     "laravel/framework": "^5.8|^6.0|^7.0|^8.0"
   },
   "require-dev": {

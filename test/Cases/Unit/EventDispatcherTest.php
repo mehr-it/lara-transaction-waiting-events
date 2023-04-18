@@ -9,9 +9,8 @@
 	use Illuminate\Support\Arr;
 	use Illuminate\Support\Facades\Bus;
 	use Illuminate\Support\Facades\DB;
-	use MehrIt\LaraMySqlLocks\Exception\DbLockTimeoutException;
-	use MehrIt\LaraMySqlLocks\Facades\DbLock;
 	use MehrIt\LaraTransactionWaitingEvents\EventDispatcher;
+	use MehrIt\LaraTransactionWaitingEvents\MySqlLock;
 	use MehrIt\LaraTransactionWaitingEvents\Queue\CallTransactionWaitingQueuedListener;
 	use MehrItLaraTransactionWaitingEventsTest\Helpers\Listener;
 	use MehrItLaraTransactionWaitingEventsTest\Helpers\QueuedListener;
@@ -22,28 +21,19 @@
 	{
 		protected function assertLockExists($lockName, $connection = null) {
 
-			try {
-				DbLock::lock($lockName, 0, 1, $connection)->release();
+			/** @var MySqlLock $lock */
+			$lock = app(MySqlLock::class);
 
-				return false;
-			}
-			catch (DbLockTimeoutException $ex) {
-				return true;
-			}
+			return !$lock->isFree($connection, $lockName);
 
 		}
 
 		protected function assertLockMissing($lockName, $connection = null) {
 
-			try {
-				DbLock::lock($lockName, 0, 1, $connection)->release();
-
-				return true;
-			}
-			catch (DbLockTimeoutException $ex) {
-				return false;
-			}
-
+			/** @var MySqlLock $lock */
+			$lock = app(MySqlLock::class);
+			
+			return $lock->isFree($connection, $lockName);
 		}
 
 

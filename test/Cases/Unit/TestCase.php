@@ -5,7 +5,6 @@
 
 
 	use Illuminate\Support\Facades\DB;
-	use MehrIt\LaraMySqlLocks\Provider\DbLockServiceProvider;
 	use MehrIt\LaraTransactionWaitingEvents\Provider\TransactionWaitingEventsServiceProvider;
 
 	class TestCase extends \Orchestra\Testbench\TestCase
@@ -38,7 +37,6 @@
 		protected function getPackageProviders($app) {
 			return [
 				TransactionWaitingEventsServiceProvider::class,
-				DbLockServiceProvider::class,
 			];
 		}
 	}
